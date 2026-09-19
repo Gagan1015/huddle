@@ -1,0 +1,177 @@
+generator client {
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  importFileExtension = "ts"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+enum MemberRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum IssueSource {
+  MANUAL
+  AI_IMPORT
+}
+
+enum CommentKind {
+  USER
+  ASSISTANT
+}
+
+model User {
+  id            String    @id
+  name          String
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  sessions      Session[]
+  accounts      Account[]
+  memberships   Member[]
+  createdBoards Board[]   @relation("BoardCreator")
+  createdIssues Issue[]   @relation("IssueCreator")
+  comments      Comment[] @relation("CommentAuthor")
+
+  @@map("user")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?  @db.Text
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  accessToken           String?   @db.Text
+  refreshToken          String?   @db.Text
+  idToken               String?   @db.Text
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String    @id
+  identifier String
+  value      String    @db.Text
+  expiresAt  DateTime
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
+
+model Organization {
+  id          String   @id @default(cuid())
+  name        String   @db.VarChar(191)
+  description String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  members     Member[]
+  boards      Board[]
+}
+
+model Member {
+  id             String       @id @default(cuid())
+  role           MemberRole   @default(MEMBER)
+  userId         String
+  organizationId String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+  @@index([organizationId])
+}
+
+model Board {
+  id             String        @id @default(cuid())
+  title          String        @db.VarChar(191)
+  description    String?       @db.Text
+  organizationId String
+  createdById    String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy      User?         @relation("BoardCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  columns        BoardColumn[]
+
+  @@index([organizationId])
+  @@index([createdById])
+}
+
+model BoardColumn {
+  id        String   @id @default(cuid())
+  name      String   @db.VarChar(191)
+  position  Int
+  boardId   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  board     Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  issues    Issue[]
+
+  @@unique([boardId, name])
+  @@index([boardId, position])
+}
+
+model Issue {
+  id          String      @id @default(cuid())
+  title       String      @db.VarChar(191)
+  description String?     @db.Text
+  position    Int
+  source      IssueSource @default(MANUAL)
+  columnId    String
+  createdById String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  column      BoardColumn @relation(fields: [columnId], references: [id], onDelete: Restrict)
+  createdBy   User?       @relation("IssueCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  comments    Comment[]
+
+  @@index([columnId, position])
+  @@index([createdById])
+}
+
+model Comment {
+  id        String      @id @default(cuid())
+  body      String      @db.Text
+  kind      CommentKind @default(USER)
+  issueId   String
+  authorId  String?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  issue     Issue       @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  author    User?       @relation("CommentAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([issueId, createdAt])
+  @@index([authorId])
+}
