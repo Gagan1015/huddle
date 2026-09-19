@@ -1,25 +1,30 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import { MailOpen01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import {
   createOrganizationInputSchema,
   type CreateOrganizationInput,
+  type Me,
 } from "@huddle/shared";
 import { useForm } from "react-hook-form";
-import { Link, useNavigate } from "react-router";
+import { Link, useNavigate, useOutletContext } from "react-router";
 import { toast } from "sonner";
 
 import { describedBy, FormField } from "@/components/common/form-field";
 import { Spinner } from "@/components/common/page-state";
 import { Brand } from "@/components/layout/brand";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useCreateOrganization } from "@/features/organizations";
 import { useWorkspace } from "@/features/workspace";
 import { errorMessage } from "@/lib/api";
-import { initials } from "@/lib/format";
+import { initials, pluralize } from "@/lib/format";
 
 export function NewOrganizationPage() {
   const navigate = useNavigate();
+  const me = useOutletContext<Me>();
   const { organizations, setActiveOrganizationId } = useWorkspace();
   const createOrganization = useCreateOrganization();
 
@@ -60,6 +65,21 @@ export function NewOrganizationPage() {
             </p>
           </div>
         </div>
+
+        {me.invitations.length > 0 ? (
+          <Alert className="mb-5">
+            <HugeiconsIcon
+              icon={MailOpen01Icon}
+              strokeWidth={1.5}
+              aria-hidden="true"
+            />
+            <AlertDescription>
+              You have {pluralize(me.invitations.length, "pending invitation")}.{" "}
+              <Link to="/invitations">Review and join</Link> instead of starting
+              from scratch.
+            </AlertDescription>
+          </Alert>
+        ) : null}
 
         <form
           onSubmit={(event) => void submit(event)}

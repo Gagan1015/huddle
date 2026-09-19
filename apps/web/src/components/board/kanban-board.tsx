@@ -5,6 +5,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { AddColumn } from "@/components/board/add-column";
+import { BoardPeopleProvider } from "@/components/board/board-people";
+import { ImportActivity } from "@/components/board/import-activity";
 import {
   APPEND_INDEX,
   buildLayout,
@@ -18,7 +20,13 @@ import { KanbanColumn } from "@/components/board/kanban-column";
 import { useMoveColumn, useMoveIssue } from "@/features/boards";
 import { errorMessage } from "@/lib/api";
 
-export function KanbanBoard({ board }: { board: BoardDetail }) {
+export function KanbanBoard({
+  board,
+  currentUserId,
+}: {
+  board: BoardDetail;
+  currentUserId: string;
+}) {
   const [layout, setLayout] = useState<BoardLayout>(() => buildLayout(board));
   const [isDragging, setIsDragging] = useState(false);
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
@@ -33,15 +41,18 @@ export function KanbanBoard({ board }: { board: BoardDetail }) {
   const issuesById = useMemo(() => indexById(board.issues), [board.issues]);
   const serverLayout = useMemo(() => buildLayout(board), [board]);
 
-  // Render from a local snapshot during a drag; adopt fresh server data only
-  // when a new board payload arrives and nothing is being dragged.
+  // Render from a local snapshot during a drag and while the resulting move is
+  // in flight, so a remote event landing mid-gesture cannot snap the card back.
+  // Fresh server data is adopted once the hold ends.
+  const holdLayout = isDragging || moveIssue.isPending || moveColumn.isPending;
+
   useEffect(() => {
-    if (isDragging || lastSyncedRef.current === board) {
+    if (holdLayout || lastSyncedRef.current === board) {
       return;
     }
     lastSyncedRef.current = board;
     setLayout(buildLayout(board));
-  }, [board, isDragging]);
+  }, [board, holdLayout]);
 
   const resetLayout = () => setLayout(buildLayout(board));
 
@@ -71,7 +82,7 @@ export function KanbanBoard({ board }: { board: BoardDetail }) {
     : null;
 
   return (
-    <>
+    <BoardPeopleProvider organizationId={board.organizationId}>
       <DragDropProvider
         onDragStart={() => setIsDragging(true)}
         onDragOver={(event) => {
@@ -157,6 +168,8 @@ export function KanbanBoard({ board }: { board: BoardDetail }) {
         </div>
       </DragDropProvider>
 
+      <ImportActivity boardId={board.id} currentUserId={currentUserId} />
+
       <IssueSheet
         boardId={board.id}
         issue={selectedIssue}
@@ -168,6 +181,6 @@ export function KanbanBoard({ board }: { board: BoardDetail }) {
           }
         }}
       />
-    </>
+    </BoardPeopleProvider>
   );
 }

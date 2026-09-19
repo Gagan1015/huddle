@@ -19,6 +19,14 @@ enum IssueSource {
   AI_IMPORT
 }
 
+enum IssuePriority {
+  NONE
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
 enum CommentKind {
   USER
   ASSISTANT
@@ -35,9 +43,12 @@ model User {
   sessions      Session[]
   accounts      Account[]
   memberships   Member[]
-  createdBoards Board[]   @relation("BoardCreator")
-  createdIssues Issue[]   @relation("IssueCreator")
-  comments      Comment[] @relation("CommentAuthor")
+  sentInvitations Invitation[] @relation("InvitationInviter")
+  createdBoards  Board[]   @relation("BoardCreator")
+  createdIssues  Issue[]   @relation("IssueCreator")
+  assignedIssues Issue[]   @relation("IssueAssignee")
+  assignedByMe   Issue[]   @relation("IssueAssigner")
+  comments       Comment[] @relation("CommentAuthor")
 
   @@map("user")
 }
@@ -97,6 +108,7 @@ model Organization {
   updatedAt   DateTime @updatedAt
   members     Member[]
   boards      Board[]
+  invitations Invitation[]
 }
 
 model Member {
@@ -111,6 +123,27 @@ model Member {
 
   @@unique([userId, organizationId])
   @@index([organizationId])
+}
+
+// A pending invitation. Accepting or revoking deletes the row, so "pending"
+// simply means "exists and has not expired"; one open invitation per address
+// per organization.
+model Invitation {
+  id             String       @id @default(cuid())
+  // Stored lowercased; matched against the signed-in user's email on accept.
+  email          String       @db.VarChar(191)
+  role           MemberRole   @default(MEMBER)
+  organizationId String
+  invitedById    String?
+  expiresAt      DateTime
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invitedBy      User?        @relation("InvitationInviter", fields: [invitedById], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, email])
+  @@index([email])
+  @@index([invitedById])
 }
 
 model Board {
@@ -144,21 +177,31 @@ model BoardColumn {
 }
 
 model Issue {
-  id          String      @id @default(cuid())
-  title       String      @db.VarChar(191)
-  description String?     @db.Text
-  position    Int
-  source      IssueSource @default(MANUAL)
-  columnId    String
-  createdById String?
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  column      BoardColumn @relation(fields: [columnId], references: [id], onDelete: Restrict)
-  createdBy   User?       @relation("IssueCreator", fields: [createdById], references: [id], onDelete: SetNull)
-  comments    Comment[]
+  id           String        @id @default(cuid())
+  title        String        @db.VarChar(191)
+  description  String?       @db.Text
+  position     Int
+  source       IssueSource   @default(MANUAL)
+  priority     IssuePriority @default(NONE)
+  // Calendar date only; the API serializes it as YYYY-MM-DD.
+  dueDate      DateTime?     @db.Date
+  columnId     String
+  createdById  String?
+  assigneeId   String?
+  // Who last set the assignee; cleared when the issue is unassigned.
+  assignedById String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  column       BoardColumn   @relation(fields: [columnId], references: [id], onDelete: Restrict)
+  createdBy    User?         @relation("IssueCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  assignee     User?         @relation("IssueAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  assignedBy   User?         @relation("IssueAssigner", fields: [assignedById], references: [id], onDelete: SetNull)
+  comments     Comment[]
 
   @@index([columnId, position])
   @@index([createdById])
+  @@index([assigneeId])
+  @@index([assignedById])
 }
 
 model Comment {

@@ -10,6 +10,7 @@ import { useNavigate } from "react-router";
 import { apiFetch } from "@/lib/api";
 import { fetchPublicConfig, signOut } from "@/lib/auth";
 import { queryKeys } from "@/lib/query-keys";
+import { getSocket } from "@/lib/socket";
 
 export const meQueryOptions = queryOptions({
   queryKey: queryKeys.me,
@@ -35,6 +36,7 @@ export function useSignOut() {
   return useMutation({
     mutationFn: signOut,
     onSuccess: () => {
+      getSocket().disconnect();
       queryClient.clear();
       void navigate("/sign-in", { replace: true });
     },

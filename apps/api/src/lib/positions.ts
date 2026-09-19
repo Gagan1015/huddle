@@ -1,8 +1,10 @@
+import { POSITION_GAP } from "@huddle/shared";
+
 // Columns and issues are ordered by integer positions with gaps so that a move
 // usually touches one row. When two neighbours have no integer between them,
 // the whole sibling list is re-spread inside the same transaction.
 
-export const POSITION_GAP = 1024;
+export { POSITION_GAP };
 
 export interface Positioned {
   id: string;

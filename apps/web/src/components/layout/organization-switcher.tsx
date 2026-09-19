@@ -1,5 +1,6 @@
 import {
   Add01Icon,
+  MailOpen01Icon,
   Tick02Icon,
   UnfoldMoreIcon,
 } from "@hugeicons/core-free-icons";
@@ -19,7 +20,14 @@ import { useWorkspace } from "@/features/workspace";
 import { initials } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-export function OrganizationSwitcher({ className }: { className?: string }) {
+export function OrganizationSwitcher({
+  pendingInvitations = 0,
+  className,
+}: {
+  /** Invitations waiting for the signed-in user; surfaces a link to review them. */
+  pendingInvitations?: number;
+  className?: string;
+}) {
   const navigate = useNavigate();
   const { organizations, activeOrganization, setActiveOrganizationId } =
     useWorkspace();
@@ -84,6 +92,20 @@ export function OrganizationSwitcher({ className }: { className?: string }) {
           </DropdownMenuItem>
         ))}
         <DropdownMenuSeparator />
+        {pendingInvitations > 0 ? (
+          <DropdownMenuItem onSelect={() => void navigate("/invitations")}>
+            <HugeiconsIcon
+              icon={MailOpen01Icon}
+              size={16}
+              strokeWidth={1.5}
+              aria-hidden="true"
+            />
+            <span className="flex-1">Invitations</span>
+            <span className="rounded-full bg-primary px-1.5 text-[11px] font-semibold text-primary-foreground">
+              {pendingInvitations}
+            </span>
+          </DropdownMenuItem>
+        ) : null}
         <DropdownMenuItem onSelect={() => void navigate("/organizations/new")}>
           <HugeiconsIcon
             icon={Add01Icon}

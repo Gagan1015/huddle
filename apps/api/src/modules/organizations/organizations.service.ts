@@ -17,6 +17,7 @@ import {
   toOrganizationMembershipDto,
   toUserSummary,
 } from "../../lib/serializers.js";
+import { listInvitationsForUser } from "../invitations/invitations.service.js";
 
 export async function listOrganizationsForUser(
   userId: string,
@@ -33,6 +34,11 @@ export async function listOrganizationsForUser(
 }
 
 export async function getMe(user: SessionUser): Promise<Me> {
+  const [organizations, invitations] = await Promise.all([
+    listOrganizationsForUser(user.id),
+    listInvitationsForUser(user),
+  ]);
+
   return {
     user: toUserSummary({
       id: user.id,
@@ -40,7 +46,8 @@ export async function getMe(user: SessionUser): Promise<Me> {
       email: user.email,
       image: user.image ?? null,
     }),
-    organizations: await listOrganizationsForUser(user.id),
+    organizations,
+    invitations,
   };
 }
 

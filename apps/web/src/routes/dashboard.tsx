@@ -1,4 +1,8 @@
-import { Add01Icon, DashboardSquare01Icon } from "@hugeicons/core-free-icons";
+import {
+  Add01Icon,
+  DashboardSquare01Icon,
+  UserAdd01Icon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect } from "react";
 import { Link, Navigate, useParams, useSearchParams } from "react-router";
@@ -11,6 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useBoards } from "@/features/boards";
 import { useWorkspace } from "@/features/workspace";
 import { formatRelativeTime, pluralize } from "@/lib/format";
+import { canManageOrganization } from "@/lib/member-meta";
 
 export function DashboardPage() {
   const { organizationId = "" } = useParams();
@@ -63,15 +68,30 @@ export function DashboardPage() {
                 "Pick a board to keep working, or start a new one for the next project."}
             </p>
           </div>
-          <Button onClick={() => setCreateOpen(true)}>
-            <HugeiconsIcon
-              icon={Add01Icon}
-              size={16}
-              strokeWidth={1.5}
-              aria-hidden="true"
-            />
-            New board
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            {canManageOrganization(organization.role) ? (
+              <Button asChild variant="outline">
+                <Link to={`/organizations/${organization.id}/members`}>
+                  <HugeiconsIcon
+                    icon={UserAdd01Icon}
+                    size={16}
+                    strokeWidth={1.5}
+                    aria-hidden="true"
+                  />
+                  Invite people
+                </Link>
+              </Button>
+            ) : null}
+            <Button onClick={() => setCreateOpen(true)}>
+              <HugeiconsIcon
+                icon={Add01Icon}
+                size={16}
+                strokeWidth={1.5}
+                aria-hidden="true"
+              />
+              New board
+            </Button>
+          </div>
         </div>
 
         <section

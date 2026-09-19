@@ -10,3 +10,15 @@ export const nonEmptyTextSchema = (max: number) =>
 
 export const optionalTextSchema = (max: number) =>
   z.string().trim().max(max).optional();
+
+/** Gap between adjacent column/issue positions; shared so clients can predict appended positions. */
+export const POSITION_GAP = 1024;
+
+// Siblings whose gapped positions were rewritten during a move. Clients apply
+// these alongside the moved item so every order converges without a refetch.
+export const positionUpdateSchema = z.object({
+  id: idSchema,
+  position: z.number().int().nonnegative(),
+});
+
+export type PositionUpdate = z.infer<typeof positionUpdateSchema>;

@@ -1,7 +1,8 @@
 import { KanbanIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import type { Me } from "@huddle/shared";
 import { useEffect } from "react";
-import { Link, useParams } from "react-router";
+import { Link, useOutletContext, useParams } from "react-router";
 
 import { BoardHeader } from "@/components/board/board-header";
 import { KanbanBoard } from "@/components/board/kanban-board";
@@ -10,6 +11,7 @@ import { useShellHeader } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useBoard } from "@/features/boards";
+import { useBoardRoom } from "@/features/realtime";
 import { useWorkspace } from "@/features/workspace";
 import { isApiError } from "@/lib/api";
 
@@ -37,7 +39,9 @@ function BoardSkeleton() {
 
 export function BoardPage() {
   const { boardId = "" } = useParams();
+  const me = useOutletContext<Me>();
   const board = useBoard(boardId);
+  const presence = useBoardRoom(boardId);
   const { organizations, activeOrganization, setActiveOrganizationId } =
     useWorkspace();
   const { setHeader } = useShellHeader();
@@ -56,13 +60,18 @@ export function BoardPage() {
   useEffect(() => {
     setHeader(
       board.data ? (
-        <BoardHeader board={board.data} organizationName={organizationName} />
+        <BoardHeader
+          board={board.data}
+          organizationName={organizationName}
+          presence={presence}
+          currentUserId={me.user.id}
+        />
       ) : (
         <Skeleton className="h-5 w-48" />
       ),
     );
     return () => setHeader(null);
-  }, [board.data, organizationName, setHeader]);
+  }, [board.data, organizationName, presence, me.user.id, setHeader]);
 
   if (board.isPending) {
     return <BoardSkeleton />;
@@ -101,8 +110,9 @@ export function BoardPage() {
   }
 
   return (
-    <div className="min-h-0 flex-1">
-      <KanbanBoard board={board.data} />
+    // Positioned so the import progress pill can sit over the foot of the board.
+    <div className="relative min-h-0 flex-1">
+      <KanbanBoard board={board.data} currentUserId={me.user.id} />
     </div>
   );
 }

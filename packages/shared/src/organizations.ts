@@ -41,11 +41,6 @@ export const updateOrganizationInputSchema = createOrganizationInputSchema
     message: "Provide at least one field to update.",
   });
 
-export const meSchema = z.object({
-  user: userSummarySchema,
-  organizations: z.array(organizationMembershipSchema),
-});
-
 export type MemberRole = z.infer<typeof memberRoleSchema>;
 export type Organization = z.infer<typeof organizationSchema>;
 export type OrganizationMembership = z.infer<
@@ -58,4 +53,3 @@ export type CreateOrganizationInput = z.infer<
 export type UpdateOrganizationInput = z.infer<
   typeof updateOrganizationInputSchema
 >;
-export type Me = z.infer<typeof meSchema>;

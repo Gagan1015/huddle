@@ -7,11 +7,16 @@ import { pinoHttp } from "pino-http";
 
 import { auth } from "./auth/auth.js";
 import { requireSession } from "./auth/session.js";
-import { env, isGoogleAuthEnabled } from "./config/env.js";
+import { env, isGoogleAuthEnabled, isImportEnabled } from "./config/env.js";
 import { errorHandler, notFoundHandler } from "./http/error-handler.js";
 import { logger } from "./lib/logger.js";
 import { boardsRouter } from "./modules/boards/boards.routes.js";
 import { columnsRouter } from "./modules/columns/columns.routes.js";
+import { importsRouter } from "./modules/imports/imports.routes.js";
+import {
+  invitationsRouter,
+  organizationInvitationsRouter,
+} from "./modules/invitations/invitations.routes.js";
 import { issuesRouter } from "./modules/issues/issues.routes.js";
 import {
   meRouter,
@@ -57,6 +62,7 @@ export function createApp(): Express {
   app.get("/api/public-config", (_request, response) => {
     response.json({
       auth: { emailAndPassword: true, google: isGoogleAuthEnabled },
+      features: { meetingNotesImport: isImportEnabled },
     });
   });
 
@@ -70,7 +76,13 @@ export function createApp(): Express {
   api.use(requireSession);
   api.use(meRouter);
   api.use("/organizations", organizationsRouter);
+  api.use(
+    "/organizations/:organizationId/invitations",
+    organizationInvitationsRouter,
+  );
+  api.use("/invitations", invitationsRouter);
   api.use("/boards", boardsRouter);
+  api.use("/boards", importsRouter);
   api.use("/columns", columnsRouter);
   api.use("/issues", issuesRouter);
   app.use("/api", api);

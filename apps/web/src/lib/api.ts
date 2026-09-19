@@ -1,6 +1,10 @@
 import { apiErrorSchema, type ApiErrorCode } from "@huddle/shared";
 
-const API_BASE = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
+/** Absolute API origin for split deployments; empty means same-origin (Vite proxy in dev). */
+export const API_BASE = (import.meta.env.VITE_API_URL ?? "").replace(
+  /\/$/,
+  "",
+);
 
 export type ApiErrorKind = ApiErrorCode | "UNKNOWN" | "NETWORK";
 

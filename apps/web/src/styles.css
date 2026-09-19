@@ -32,6 +32,9 @@
   --status-done: hsl(160 84% 30%);
   --status-ai: hsl(252 75% 58%);
 
+  /* Claude's terracotta, used only for the mark that credits imported issues. */
+  --brand-claude: hsl(15 63% 60%);
+
   --sidebar: hsl(220 20% 98%);
   --sidebar-foreground: hsl(224 28% 14%);
   --sidebar-primary: hsl(252 75% 58%);
@@ -70,6 +73,7 @@
   --color-status-progress: var(--status-progress);
   --color-status-done: var(--status-done);
   --color-status-ai: var(--status-ai);
+  --color-brand-claude: var(--brand-claude);
 
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
@@ -79,6 +83,17 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Indeterminate progress used only while Claude is reading notes. */
+  --animate-shimmer: shimmer 1.6s ease-in-out infinite;
+  @keyframes shimmer {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(300%);
+    }
+  }
 
   --radius-sm: calc(var(--radius) - 6px);
   --radius-md: calc(var(--radius) - 4px);

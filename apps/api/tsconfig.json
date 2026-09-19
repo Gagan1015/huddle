@@ -7,5 +7,11 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["src", "prisma.config.ts", "prisma/seed.ts"]
+  "include": [
+    "src",
+    "prisma.config.ts",
+    "prisma/seed.ts",
+    "prisma/clear-board.ts",
+    "prisma/seed-board.ts"
+  ]
 }

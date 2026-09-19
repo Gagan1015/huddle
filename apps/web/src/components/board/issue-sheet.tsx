@@ -6,6 +6,7 @@ import {
   ISSUE_TITLE_MAX,
   type BoardColumn,
   type Issue,
+  type UpdateIssueInput,
 } from "@huddle/shared";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -13,9 +14,17 @@ import { toast } from "sonner";
 import { z } from "zod";
 
 import { APPEND_INDEX } from "@/components/board/board-model";
+import { useBoardPeople } from "@/components/board/board-people";
+import {
+  AssigneeSelect,
+  DueDateInput,
+  PrioritySelect,
+} from "@/components/board/issue-field-controls";
+import { ClaudeAvatar } from "@/components/common/claude-avatar";
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { describedBy, FormField } from "@/components/common/form-field";
 import { Spinner } from "@/components/common/page-state";
+import { UserAvatar } from "@/components/common/user-avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -67,9 +76,30 @@ export function IssueSheet({
   onOpenChange: (open: boolean) => void;
 }) {
   const updateIssue = useUpdateIssue(boardId);
+  // Priority, assignee, and due date save on change; a separate mutation keeps
+  // their spinner off the "Save changes" button that belongs to the text form.
+  const updateMeta = useUpdateIssue(boardId);
   const moveIssue = useMoveIssue(boardId);
   const deleteIssue = useDeleteIssue(boardId);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const { userById } = useBoardPeople();
+
+  const saveMeta = (patch: UpdateIssueInput) => {
+    if (!issue) {
+      return;
+    }
+    updateMeta.mutate(
+      { issueId: issue.id, ...patch },
+      { onError: (error) => toast.error(errorMessage(error)) },
+    );
+  };
+
+  const creator = issue?.createdById ? userById.get(issue.createdById) : null;
+  const assigner = issue?.assignedById
+    ? userById.get(issue.assignedById)
+    : null;
+  // Claude authors imported issues; `createdById` then records who imported.
+  const fromNotes = issue?.source === "AI_IMPORT";
 
   const form = useForm<IssueFormValues>({
     resolver: zodResolver(issueFormSchema),
@@ -129,7 +159,22 @@ export function IssueSheet({
                     Created from meeting notes
                   </span>
                 ) : null}
-                <span>Created {formatRelativeTime(issue.createdAt)}</span>
+                <span className="inline-flex items-center gap-1.5">
+                  {fromNotes ? (
+                    <ClaudeAvatar size="xs" />
+                  ) : issue.createdById ? (
+                    <UserAvatar user={creator} size="xs" />
+                  ) : null}
+                  Created {formatRelativeTime(issue.createdAt)}
+                  {fromNotes
+                    ? " by Claude"
+                    : creator
+                      ? ` by ${creator.name}`
+                      : null}
+                </span>
+                {fromNotes && creator ? (
+                  <span>· Imported by {creator.name}</span>
+                ) : null}
                 {issue.updatedAt !== issue.createdAt ? (
                   <span>· Updated {formatRelativeTime(issue.updatedAt)}</span>
                 ) : null}
@@ -179,6 +224,41 @@ export function IssueSheet({
                     ))}
                   </SelectContent>
                 </Select>
+              </FormField>
+
+              <div className="grid gap-5 sm:grid-cols-2">
+                <FormField id="issue-priority" label="Priority">
+                  <PrioritySelect
+                    id="issue-priority"
+                    className="w-full"
+                    value={issue.priority}
+                    onChange={(priority) => saveMeta({ priority })}
+                  />
+                </FormField>
+                <FormField id="issue-due-date" label="Due date">
+                  <DueDateInput
+                    id="issue-due-date"
+                    value={issue.dueDate}
+                    onChange={(dueDate) => saveMeta({ dueDate })}
+                  />
+                </FormField>
+              </div>
+
+              <FormField
+                id="issue-assignee"
+                label="Assignee"
+                hint={
+                  issue.assigneeId && assigner
+                    ? `Assigned by ${assigner.name}.`
+                    : undefined
+                }
+              >
+                <AssigneeSelect
+                  id="issue-assignee"
+                  className="w-full"
+                  value={issue.assigneeId}
+                  onChange={(assigneeId) => saveMeta({ assigneeId })}
+                />
               </FormField>
 
               <FormField

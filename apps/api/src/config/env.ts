@@ -57,3 +57,6 @@ export const env = loadEnv();
 export const isGoogleAuthEnabled = Boolean(
   env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET,
 );
+
+/** Meeting-notes import needs an Anthropic key; the model falls back to a default. */
+export const isImportEnabled = Boolean(env.ANTHROPIC_API_KEY);

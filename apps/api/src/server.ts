@@ -1,27 +1,19 @@
 import { createServer } from "node:http";
 
-import { Server } from "socket.io";
-
 import { createApp } from "./app.js";
 import { env } from "./config/env.js";
 import { prisma } from "./db/prisma.js";
 import { logger } from "./lib/logger.js";
+import { setBoardEventPublisher } from "./realtime/board-events.js";
+import { createSocketPublisher } from "./realtime/socket-publisher.js";
+import { createRealtimeServer } from "./realtime/socket-server.js";
 
 const app = createApp();
 const httpServer = createServer(app);
 
-// Real-time rooms and the authenticated handshake arrive in Phase 3; the
-// server is created here so the transport is wired once.
-const io = new Server(httpServer, {
-  cors: {
-    credentials: true,
-    origin: env.WEB_ORIGIN,
-  },
-});
-
-io.on("connection", (socket) => {
-  socket.on("disconnect", () => undefined);
-});
+// Domain services publish after commit; the socket server fans out to rooms.
+const io = createRealtimeServer(httpServer);
+setBoardEventPublisher(createSocketPublisher(io));
 
 httpServer.listen(env.API_PORT, () => {
   logger.info({ port: env.API_PORT }, "Huddle API listening");
@@ -29,6 +21,7 @@ httpServer.listen(env.API_PORT, () => {
 
 async function shutdown(signal: string) {
   logger.info({ signal }, "Shutting down");
+  setBoardEventPublisher(null);
   io.close();
   httpServer.close();
   await prisma.$disconnect();

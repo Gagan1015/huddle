@@ -2,6 +2,7 @@ import type {
   CreateIssueInput,
   Issue,
   IssueDeletedPayload,
+  IssuePriority,
   IssueSource,
   MoveIssueInput,
   UpdateIssueInput,
@@ -12,10 +13,13 @@ import {
   requireIssueAccess,
 } from "../../auth/authorization.js";
 import { prisma, type Prisma } from "../../db/prisma.js";
+import { dueDateToDb } from "../../lib/dates.js";
 import { HttpError } from "../../lib/http-error.js";
 import { nextPositionAfter, planInsertion } from "../../lib/positions.js";
 import { toIssueDto } from "../../lib/serializers.js";
 import { publishToBoard } from "../../realtime/board-events.js";
+import { boardScope } from "../../realtime/rooms.js";
+import { resolveAssignment } from "./issue-policy.js";
 
 export interface InsertIssueInput {
   columnId: string;
@@ -23,6 +27,10 @@ export interface InsertIssueInput {
   description: string | null;
   source: IssueSource;
   createdById: string | null;
+  priority?: IssuePriority;
+  dueDate?: string | null;
+  assigneeId?: string | null;
+  assignedById?: string | null;
 }
 
 /**
@@ -46,9 +54,30 @@ export async function insertIssue(
       description: input.description,
       source: input.source,
       createdById: input.createdById,
+      priority: input.priority ?? "NONE",
+      dueDate: input.dueDate ? dueDateToDb(input.dueDate) : null,
+      assigneeId: input.assigneeId ?? null,
+      assignedById: input.assigneeId ? (input.assignedById ?? null) : null,
       position: nextPositionAfter(last?.position),
     },
   });
+}
+
+// Only people inside the board's organization can be assigned, so a leaked
+// user ID from another tenant is rejected rather than stored.
+async function assertAssignable(organizationId: string, assigneeId: string) {
+  const member = await prisma.member.findUnique({
+    where: { userId_organizationId: { userId: assigneeId, organizationId } },
+    select: { id: true },
+  });
+
+  if (!member) {
+    throw new HttpError(
+      400,
+      "ASSIGNEE_NOT_MEMBER",
+      "That person is not a member of this workspace.",
+    );
+  }
 }
 
 export async function createIssue(
@@ -58,6 +87,10 @@ export async function createIssue(
 ): Promise<Issue> {
   const column = await requireColumnAccess(userId, columnId);
 
+  if (input.assigneeId) {
+    await assertAssignable(column.board.organizationId, input.assigneeId);
+  }
+
   const issue = await prisma.$transaction((tx) =>
     insertIssue(tx, {
       columnId,
@@ -65,11 +98,15 @@ export async function createIssue(
       description: input.description || null,
       source: "MANUAL",
       createdById: userId,
+      priority: input.priority,
+      dueDate: input.dueDate,
+      assigneeId: input.assigneeId,
+      assignedById: userId,
     }),
   );
 
   const dto = toIssueDto(issue, column.boardId);
-  publishToBoard(column.boardId, "issue:created", dto);
+  publishToBoard(boardScope(column.board), "issue:created", dto);
 
   return dto;
 }
@@ -90,6 +127,19 @@ export async function updateIssue(
 ): Promise<Issue> {
   const existing = await requireIssueAccess(userId, issueId);
 
+  if (input.assigneeId) {
+    await assertAssignable(
+      existing.column.board.organizationId,
+      input.assigneeId,
+    );
+  }
+
+  const assignment = resolveAssignment(
+    { assigneeId: existing.assigneeId, assignedById: existing.assignedById },
+    input.assigneeId,
+    userId,
+  );
+
   const issue = await prisma.issue.update({
     where: { id: issueId },
     data: {
@@ -97,11 +147,17 @@ export async function updateIssue(
       ...(input.description !== undefined && {
         description: input.description || null,
       }),
+      ...(input.priority !== undefined && { priority: input.priority }),
+      ...(input.dueDate !== undefined && {
+        dueDate: input.dueDate ? dueDateToDb(input.dueDate) : null,
+      }),
+      assigneeId: assignment.assigneeId,
+      assignedById: assignment.assignedById,
     },
   });
 
   const dto = toIssueDto(issue, existing.column.boardId);
-  publishToBoard(existing.column.boardId, "issue:updated", dto);
+  publishToBoard(boardScope(existing.column.board), "issue:updated", dto);
 
   return dto;
 }
@@ -114,7 +170,7 @@ export async function moveIssue(
   const existing = await requireIssueAccess(userId, issueId);
   const boardId = existing.column.boardId;
 
-  const issue = await prisma.$transaction(async (tx) => {
+  const { issue, rebalanced } = await prisma.$transaction(async (tx) => {
     const destination = await tx.boardColumn.findFirst({
       where: { id: input.columnId, boardId },
       select: { id: true },
@@ -142,14 +198,20 @@ export async function moveIssue(
       });
     }
 
-    return tx.issue.update({
+    const moved = await tx.issue.update({
       where: { id: issueId },
       data: { columnId: destination.id, position: plan.position },
     });
+
+    return { issue: moved, rebalanced: plan.rebalance };
   });
 
   const dto = toIssueDto(issue, boardId);
-  publishToBoard(boardId, "issue:moved", dto);
+  // Rebalanced siblings ride along so other clients converge without refetching.
+  publishToBoard(boardScope(existing.column.board), "issue:moved", {
+    issue: dto,
+    rebalanced,
+  });
 
   return dto;
 }
@@ -167,7 +229,7 @@ export async function deleteIssue(
     columnId: existing.columnId,
     issueId,
   };
-  publishToBoard(payload.boardId, "issue:deleted", payload);
+  publishToBoard(boardScope(existing.column.board), "issue:deleted", payload);
 
   return payload;
 }

@@ -1,6 +1,11 @@
 import { z } from "zod";
 
-import { idSchema, nonEmptyTextSchema, timestampSchema } from "./common.js";
+import {
+  idSchema,
+  nonEmptyTextSchema,
+  positionUpdateSchema,
+  timestampSchema,
+} from "./common.js";
 
 export const DEFAULT_COLUMN_NAMES = [
   "Upcoming",
@@ -42,9 +47,15 @@ export const columnDeletedPayloadSchema = z.object({
   movedIssueIds: z.array(idSchema),
 });
 
+export const columnMovedPayloadSchema = z.object({
+  column: boardColumnSchema,
+  rebalanced: z.array(positionUpdateSchema),
+});
+
 export type BoardColumn = z.infer<typeof boardColumnSchema>;
 export type CreateColumnInput = z.infer<typeof createColumnInputSchema>;
 export type UpdateColumnInput = z.infer<typeof updateColumnInputSchema>;
 export type MoveColumnInput = z.infer<typeof moveColumnInputSchema>;
 export type DeleteColumnInput = z.infer<typeof deleteColumnInputSchema>;
 export type ColumnDeletedPayload = z.infer<typeof columnDeletedPayloadSchema>;
+export type ColumnMovedPayload = z.infer<typeof columnMovedPayloadSchema>;

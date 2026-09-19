@@ -26,6 +26,7 @@ import {
 
 import { apiFetch } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";
+import { isRealtimeConnected } from "@/lib/socket";
 
 export const boardsQueryOptions = (organizationId: string) =>
   queryOptions({
@@ -51,21 +52,26 @@ export function useBoard(boardId: string) {
   return useQuery(boardQueryOptions(boardId));
 }
 
-// Until Socket.IO reconciliation lands (Phase 3), every write settles by
-// refetching the affected board so REST stays the single source of truth.
+// Writes settle from the socket event the API emits after commit, for the
+// initiating client too. The REST response is never applied as a second
+// update. Without a live connection, fall back to refetching so REST remains
+// the source of truth; a failure always resyncs.
 function useBoardWrite<TVariables, TData>(
   boardId: string,
   mutationFn: (variables: TVariables) => Promise<TData>,
 ) {
   const queryClient = useQueryClient();
 
+  const resync = () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: queryKeys.board(boardId) }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.organizations }),
+    ]);
+
   return useMutation({
     mutationFn,
-    onSettled: () =>
-      Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.board(boardId) }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.organizations }),
-      ]),
+    onSuccess: () => (isRealtimeConnected() ? undefined : resync()),
+    onError: () => resync(),
   });
 }
 

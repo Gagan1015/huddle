@@ -1,11 +1,13 @@
 import type { ServerEventName, ServerEventPayload } from "@huddle/shared";
 
+import type { BoardScope } from "./rooms.js";
+
 // Domain services publish through this seam after every committed write. The
-// Socket.IO transport (Phase 3) registers a publisher that maps organization
-// and board IDs to authorized rooms; until then events are dropped.
+// Socket.IO transport registers a publisher that maps scopes to authorized
+// rooms; until it does (tests, scripts), events are dropped.
 export interface BoardEventPublisher {
   toBoard<E extends ServerEventName>(
-    boardId: string,
+    scope: BoardScope,
     event: E,
     payload: ServerEventPayload<E>,
   ): void;
@@ -28,11 +30,11 @@ export function setBoardEventPublisher(next: BoardEventPublisher | null) {
 }
 
 export function publishToBoard<E extends ServerEventName>(
-  boardId: string,
+  scope: BoardScope,
   event: E,
   payload: ServerEventPayload<E>,
 ) {
-  publisher.toBoard(boardId, event, payload);
+  publisher.toBoard(scope, event, payload);
 }
 
 export function publishToOrganization<E extends ServerEventName>(

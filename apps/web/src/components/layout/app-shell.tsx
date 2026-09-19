@@ -2,6 +2,7 @@ import {
   Add01Icon,
   DashboardSquare01Icon,
   Menu01Icon,
+  UserGroupIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type { Me } from "@huddle/shared";
@@ -9,6 +10,7 @@ import { createContext, useContext, useState, type ReactNode } from "react";
 import { NavLink, Outlet, useOutletContext } from "react-router";
 
 import { Brand } from "@/components/layout/brand";
+import { ConnectionIndicator } from "@/components/layout/connection-indicator";
 import { OrganizationSwitcher } from "@/components/layout/organization-switcher";
 import { UserMenu } from "@/components/layout/user-menu";
 import { Button } from "@/components/ui/button";
@@ -56,26 +58,41 @@ function SidebarContent({
       <div className="px-2 pt-1">
         <Brand />
       </div>
-      <OrganizationSwitcher />
+      <OrganizationSwitcher pendingInvitations={me.invitations.length} />
       <nav
         aria-label="Workspace"
         className="flex flex-1 flex-col gap-1 overflow-y-auto"
       >
         {activeOrganization ? (
-          <NavLink
-            to={`/organizations/${activeOrganization.id}`}
-            end
-            className={({ isActive }) => navLinkClass(isActive)}
-            onClick={onNavigate}
-          >
-            <HugeiconsIcon
-              icon={DashboardSquare01Icon}
-              size={16}
-              strokeWidth={1.5}
-              aria-hidden="true"
-            />
-            Dashboard
-          </NavLink>
+          <>
+            <NavLink
+              to={`/organizations/${activeOrganization.id}`}
+              end
+              className={({ isActive }) => navLinkClass(isActive)}
+              onClick={onNavigate}
+            >
+              <HugeiconsIcon
+                icon={DashboardSquare01Icon}
+                size={16}
+                strokeWidth={1.5}
+                aria-hidden="true"
+              />
+              Dashboard
+            </NavLink>
+            <NavLink
+              to={`/organizations/${activeOrganization.id}/members`}
+              className={({ isActive }) => navLinkClass(isActive)}
+              onClick={onNavigate}
+            >
+              <HugeiconsIcon
+                icon={UserGroupIcon}
+                size={16}
+                strokeWidth={1.5}
+                aria-hidden="true"
+              />
+              Members
+            </NavLink>
+          </>
         ) : null}
         <p className="mt-3 mb-1 px-2 text-xs font-medium tracking-wide text-muted-foreground">
           Boards
@@ -157,6 +174,7 @@ export function AppShell() {
             <div className="flex min-w-0 flex-1 items-center gap-3">
               {header}
             </div>
+            <ConnectionIndicator />
           </header>
           <main className="flex min-h-0 flex-1 flex-col">
             <Outlet context={me} />

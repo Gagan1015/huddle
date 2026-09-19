@@ -2,6 +2,8 @@ import { apiFetch } from "./api";
 
 export interface PublicConfig {
   auth: { emailAndPassword: boolean; google: boolean };
+  /** Server-side capabilities that need configuration, so the UI can say why a button is off. */
+  features: { meetingNotesImport: boolean };
 }
 
 export interface EmailCredentials {

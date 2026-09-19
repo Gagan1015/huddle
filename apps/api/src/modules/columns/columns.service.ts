@@ -20,6 +20,7 @@ import {
 } from "../../lib/positions.js";
 import { toColumnDto } from "../../lib/serializers.js";
 import { publishToBoard } from "../../realtime/board-events.js";
+import { boardScope } from "../../realtime/rooms.js";
 import { resolveColumnDeletion } from "./column-policy.js";
 
 async function assertColumnNameAvailable(
@@ -51,7 +52,7 @@ export async function createColumn(
   boardId: string,
   input: CreateColumnInput,
 ): Promise<BoardColumn> {
-  await requireBoardAccess(userId, boardId);
+  const board = await requireBoardAccess(userId, boardId);
 
   const column = await prisma.$transaction(async (tx) => {
     await assertColumnNameAvailable(tx, boardId, input.name);
@@ -72,7 +73,7 @@ export async function createColumn(
   });
 
   const dto = toColumnDto(column);
-  publishToBoard(boardId, "column:created", dto);
+  publishToBoard(boardScope(board), "column:created", dto);
 
   return dto;
 }
@@ -94,7 +95,7 @@ export async function renameColumn(
   });
 
   const dto = toColumnDto(updated);
-  publishToBoard(column.boardId, "column:updated", dto);
+  publishToBoard(boardScope(column.board), "column:updated", dto);
 
   return dto;
 }
@@ -106,7 +107,7 @@ export async function moveColumn(
 ): Promise<BoardColumn> {
   const column = await requireColumnAccess(userId, columnId);
 
-  const updated = await prisma.$transaction(async (tx) => {
+  const { updated, rebalanced } = await prisma.$transaction(async (tx) => {
     const siblings = await tx.boardColumn.findMany({
       where: { boardId: column.boardId, id: { not: columnId } },
       orderBy: { position: "asc" },
@@ -121,14 +122,19 @@ export async function moveColumn(
       });
     }
 
-    return tx.boardColumn.update({
+    const moved = await tx.boardColumn.update({
       where: { id: columnId },
       data: { position: plan.position },
     });
+
+    return { updated: moved, rebalanced: plan.rebalance };
   });
 
   const dto = toColumnDto(updated);
-  publishToBoard(column.boardId, "column:moved", dto);
+  publishToBoard(boardScope(column.board), "column:moved", {
+    column: dto,
+    rebalanced,
+  });
 
   return dto;
 }
@@ -205,7 +211,7 @@ export async function deleteColumn(
     } satisfies ColumnDeletedPayload;
   });
 
-  publishToBoard(boardId, "column:deleted", payload);
+  publishToBoard(boardScope(column.board), "column:deleted", payload);
 
   return payload;
 }

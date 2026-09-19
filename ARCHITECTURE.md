@@ -72,6 +72,7 @@ The baseline model should include:
 - Better Auth account/session/verification tables
 - `Organization`
 - `Member`
+- `Invitation`
 - `Board`
 - `BoardColumn`
 - `Issue`
@@ -80,6 +81,7 @@ The baseline model should include:
 Recommended additions to the initial sketch:
 
 - `Member.role`: `OWNER`, `ADMIN`, or `MEMBER`
+- `Invitation`: a pending, email-bound invitation with a role (`ADMIN` or `MEMBER`) and expiry, unique on `(organizationId, email)`; accepting or revoking deletes the row, so "pending" means "exists and has not expired"
 - `BoardColumn.position`: integer rank with gaps, scoped to its board
 - `Issue.columnId`: required relation to a column rather than a fixed status enum
 - `Issue.position`: integer rank with gaps, scoped to its column
@@ -132,10 +134,10 @@ If low latency requires optimistic UI later, use a client mutation ID and determ
 ## Socket.IO authorization
 
 - Authenticate during the Socket.IO handshake using the same session system as REST.
-- Have the server resolve authorized memberships.
-- On `board:join`, verify access before joining `org:{orgId}:board:{boardId}`.
-- Emit board mutations only to the appropriate room.
-- Remove or refresh rooms when authorization changes.
+- Have the server resolve authorized memberships and join `org:{orgId}` rooms during the handshake, before any event handler can run.
+- On `board:join`, validate the payload with the shared schema, verify access with the same helper REST uses, then join `org:{orgId}:board:{boardId}`. Acknowledge with `{ ok }` or a coded error so the client can react.
+- Emit board mutations only to the appropriate room, carrying rebalanced sibling positions with `*:moved` events.
+- Room membership is re-evaluated on every reconnect; revoking access mid-session takes effect at the next reconnect.
 - Validate every incoming and outgoing payload.
 
 ## Transcript import
@@ -168,6 +170,8 @@ Processing flow:
 10. On failure, emit `import:failed` and return a stable error response.
 
 The HTTP request can return after validated persistence while a lightweight emission scheduler handles the visual stagger. Do not delay database commits or hold transactions merely for animation.
+
+Parsing policy as implemented: safe fields are normalized (whitespace collapsed, titles and descriptions clipped to the issue limits) before Zod validation; a task with an unknown `columnId` rejects the whole import rather than falling back to the first column; an empty list is a `422 IMPORT_NO_TASKS`; tasks beyond the cap of 25 are dropped and counted in the server log. All tasks are inserted in one transaction so a failure part-way leaves no half-imported board.
 
 ## API conventions
 
